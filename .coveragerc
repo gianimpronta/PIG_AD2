@@ -1,0 +1,5 @@
+[run]
+omit =
+    BalancedBSTSetTest.py
+    main.py
+    text.py
