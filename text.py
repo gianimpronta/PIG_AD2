@@ -24,3 +24,5 @@ p1.position = (xmin - dx, p2.y - vdsp * height)
 p2.position = (xmax + dx, p2.y)
 
 mapwv = mapper((0, 0, 1, 1), (0, 0, CANVAS_WIDTH, CANVAS_HEIGHT))
+mapwv.window = (p1.x, p1.y, p2.x, p2.y)
+

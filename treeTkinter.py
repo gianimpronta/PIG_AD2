@@ -26,8 +26,6 @@ LIGHTGRAY = rgb2hex(255*0.7, 255*0.7, 255*0.7)
 CANVAS_HEIGHT = 512
 CANVAS_WIDTH = 1024
 
-## convert ang in degrees to radians.
-toDegree = lambda ang: pi * ang / 180.0
 ## area for picking.
 pickRadius = lambda r: max(3.0 * r, radius)
 ## horizontal displacement for a given height.
@@ -204,10 +202,10 @@ class mapper:
     #
     def toWorldCoordinates(self, x=0, y=0):
         # make y grow upward
-        y = self.up(y)
+        # y = self.up(y)
         pt = WorldPoint((x - self.__xpos) * self.__sx,
                         (y - self.__ypos) * self.__sy)
-        pt += self.__p1
+        pt += self.__p2
 
         # assert self.toScreenCoordinates(pt) == (x,y)
 
@@ -220,8 +218,12 @@ class mapper:
     # @see http://www.di.ubi.pt/~agomes/cg/teoricas/04e-windows.pdf
     #
     def toScreenCoordinates(self, wp):
-        pt = (int(round((wp.x - self.__p1.x) / self.__sx)) + self.__xpos,
-              int(round((wp.y - self.__p1.y) / self.__sy)) + self.__ypos)
+        # pt = (int(round((wp.x-self.__p1.x)/(self.__p2.x-self.__p1.x))*(self.__xsize)+ self.__xpos),
+        #        int(round((wp.y-self.__p1.y)/(self.__p2.y-self.__p1.y))*(self.__ysize)+ self.__ypos))
+        
+        
+        pt = (int(round((wp.x) / self.__sx)) + self.__xpos,
+              int(round((wp.y) / self.__sy)) + self.__ypos)
 
         return pt
 
@@ -235,9 +237,7 @@ class mapper:
 def text(pt, s):
     global c
     x, y = mapwv.toScreenCoordinates(pt)
-    s += f'{pt}\n'
-    s += f'{x}, {y}'
-    c.create_text((x+1, y), fill=BLACK, font=font, text=s)
+    c.create_text((x, y), fill=BLACK, font=font, text=s)
 
 # ===============================  pldraw  =====================================#
 
@@ -253,7 +253,7 @@ def ldraw(pts):
 def pnt(pt):
     global c
     x, y = mapwv.toScreenCoordinates(pt)
-    c.create_line(x, y, x, y)
+    c.create_oval(x-3, y-3, x+3, y+3,)
 
 
 # =========================  circ  =============================================#
@@ -264,13 +264,12 @@ def pnt(pt):
 #  @param r radius of the circle.
 #
 def circ(center, r, color=DARKGRAY):
-    global font, c, fontSmall, fontNormal, mapwv
+    global c, mapwv
 
     x, y = mapwv.toScreenCoordinates(center)
-    # font = fontNormal
+    print(f'Na tela x: {x}, y: {y}')
     if mapwv.aspect > 3.0 or mapwv.aspect < 0.2:
         pnt(center)
-        # font = fontSmall
         return
     c.create_oval(x-r, y-r, x+r, y+r, fill=color)
 
@@ -396,7 +395,7 @@ def locateNode(rnode, center, ht, pos, hdsp):
 #
 def drawTree(rnode, center, ht, hdsp):
     pts = [center.copy(), center.copy()]
-
+    print(f'center: {center}')
     if (rnode.left == NullNode and rnode.right == NullNode):
         color = ORANGE  # leaf node
         if mapwv.aspect < 1:
@@ -484,7 +483,7 @@ def createTree(type, nNodes, data=None):
 
 ## displays a tree.
 def displayTree():
-    global hdsp, vdsp
+    global hdsp, vdsp, mapwv
 
     if Stree.root() is NullNode: return
 
@@ -512,6 +511,8 @@ def displayTree():
     # gluOrtho2D(p1.x, p2.x, p1.y, p2.y)
 
     mapwv.window = (p1.x, p1.y, p2.x, p2.y)
+    print(f'mundo: {mapwv.window}, viewport: {mapwv.viewport}')
+
     drawTree(Stree.root(), getCenter(), height, hdsp)
 
 
@@ -657,8 +658,7 @@ def deleteNode(event):
     height = Stree.height()
     height += 1
     pt = mapwv.toWorldCoordinates(x, y)
-    node = locateNode(Stree.root(), getCenter(), height,
-                      mapwv.toScreenCoordinates(WorldPoint(x,y)))
+    node = locateNode(Stree.root(), getCenter(), height, pt, hdsp)
     print(x,y)
     print(pt)
     if (node != NullNode):
@@ -680,12 +680,13 @@ def printTree(event):
 
 ## prints information about a node close to (x,y).
 def info(event):
-    x= event.x
-    y= event.y
+    x = event.x
+    y = event.y
     height = Stree.height()
     height += 1
     pt = mapwv.toWorldCoordinates(x, y)
-    node = locateNode(Stree.root(), getCenter(), height, pt)
+    print(pt)
+    node = locateNode(Stree.root(), getCenter(), height, pt, hdsp)
 
     if (node != NullNode):
         nd = Stree.findEntry(node.data)
@@ -753,15 +754,12 @@ def main(argv=None):
 
     c = Canvas(app, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
                background=BACKGROUND)
-    # mouse_handler(c)
+    mouse_handler(c)
     c.bind("<Key>", keyboard_handler)
     c.pack(fill=BOTH, expand=YES)
     c.focus_set()
 
     createTree(type, nNodes, ndata)
-    print(Stree)
-    print(f'{Stree!r}')
-
     try:
         redraw()
         app.mainloop()
