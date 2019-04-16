@@ -1,9 +1,23 @@
+#!/usr/bin/env python
+# coding: UTF-8
+# vim: tabstop=4:softtabstop=4:shiftwidth=4
+#
+## @package treeTkinter
+#
+#  Balanced Binary Tree using Tkinter.
+#
+#  @author Gianpaolo Martins Impronta
+#  @since 16/04/2019
+#
+
+import operator
 from random import randint
 from tkinter import *
 from tkinter import font
 
-from BSTSet import generateRandomArray, BSTSet
-from math import sin, cos, pi, pow, fabs
+from BalancedBSTSet import generateRandomArray
+from BalancedBSTSet import BalancedBSTSet as BSTSet
+from math import pow, fabs
 
 def rgb2hex(r,g,b):
     return "#{:02x}{:02x}{:02x}".format(int(r),int(g),int(b))
@@ -26,12 +40,6 @@ LIGHTGRAY = rgb2hex(255*0.7, 255*0.7, 255*0.7)
 CANVAS_HEIGHT = 512
 CANVAS_WIDTH = 1024
 
-## area for picking.
-pickRadius = lambda r: max(3.0 * r, radius)
-## horizontal displacement for a given height.
-
-def HDSP(ht, hdsp):
-    return hdsp * pow(2.0, ht - 2)
 ## radius of a circle in world coordinates.
 radius = 10.0
 ## space between nodes and labels.
@@ -203,9 +211,7 @@ class mapper:
     def toWorldCoordinates(self, x=0, y=0):
         # make y grow upward
         # y = self.up(y)
-        pt = WorldPoint((x - self.__xpos) * self.__sx,
-                        (y - self.__ypos) * self.__sy)
-        pt += self.__p2
+        pt = WorldPoint(float(x * self.__sx)+self.__p1.x,float(y * self.__sy))
 
         # assert self.toScreenCoordinates(pt) == (x,y)
 
@@ -218,14 +224,28 @@ class mapper:
     # @see http://www.di.ubi.pt/~agomes/cg/teoricas/04e-windows.pdf
     #
     def toScreenCoordinates(self, wp):
-        # pt = (int(round((wp.x-self.__p1.x)/(self.__p2.x-self.__p1.x))*(self.__xsize)+ self.__xpos),
-        #        int(round((wp.y-self.__p1.y)/(self.__p2.y-self.__p1.y))*(self.__ysize)+ self.__ypos))
-        
-        
-        pt = (int(round((wp.x) / self.__sx)) + self.__xpos,
-              int(round((wp.y) / self.__sy)) + self.__ypos)
+        pt = (
+            int(round((wp.x - self.__p1.x)/self.__sx)),
+            int(round((wp.y)/self.__sy))
+        )
+
 
         return pt
+
+## calculate HDSP for a given ht
+#
+# @param ht heigth
+# @param hdsp base hdsp
+#
+def HDSP(ht, hdsp):
+    return hdsp * pow(2.0, ht - 2)
+
+## area for picking.
+#
+# @param r radius
+#
+def pickRadius(r):
+    return max(3.0 * r, radius)
 
 # =================================  text  =====================================#
 
@@ -234,10 +254,10 @@ class mapper:
 #  @param pt starting position.
 #  @param s string.
 #
-def text(pt, s):
+def text(pt, s, anchor):
     global c
     x, y = mapwv.toScreenCoordinates(pt)
-    c.create_text((x, y), fill=BLACK, font=font, text=s)
+    c.create_text((x+1, y+1), fill=BLACK, font=font, text=s, anchor=anchor)
 
 # ===============================  pldraw  =====================================#
 
@@ -250,11 +270,11 @@ def ldraw(pts):
 # ==================================  pnt  =====================================#
 
 ## draws a point at pt.
-def pnt(pt):
+def pnt(pt, color):
     global c
+    r=5
     x, y = mapwv.toScreenCoordinates(pt)
-    c.create_oval(x-3, y-3, x+3, y+3,)
-
+    c.create_oval(x-r, y-r, x+r, y+r, fill=color, outline=LIGHTGRAY)
 
 # =========================  circ  =============================================#
 
@@ -264,15 +284,15 @@ def pnt(pt):
 #  @param r radius of the circle.
 #
 def circ(center, r, color=DARKGRAY):
-    global c, mapwv
+    global c, mapwv, font
 
     x, y = mapwv.toScreenCoordinates(center)
-    print(f'Na tela x: {x}, y: {y}')
-    if mapwv.aspect > 3.0 or mapwv.aspect < 0.2:
-        pnt(center)
+    font = fontNormal
+    if mapwv.aspect > 2.0 or mapwv.aspect < 0.2:
+        pnt(center, color)
+        font = fontSmall
         return
-    c.create_oval(x-r, y-r, x+r, y+r, fill=color)
-
+    c.create_oval(x-r, y-r, x+r, y+r, fill=color, outline=LIGHTGRAY)
 
 # =========================  printHelp  =========================================#
 
@@ -395,26 +415,43 @@ def locateNode(rnode, center, ht, pos, hdsp):
 #
 def drawTree(rnode, center, ht, hdsp):
     pts = [center.copy(), center.copy()]
+    text_coord = center.copy()
     print(f'center: {center}')
+    print(f'aspect: {mapwv.aspect}')
     if (rnode.left == NullNode and rnode.right == NullNode):
         color = ORANGE  # leaf node
+        anchor = "n"
+        text_coord = mapwv.toScreenCoordinates(text_coord)
         if mapwv.aspect < 1:
-            pts[0].y -= radius / mapwv.aspect + 1.5 * space
+            text_coord = tuple(map(
+                operator.add, text_coord, (0, radius + space)
+            ))
         else:
-            pts[0].y -= radius + 1.5 * space
+            text_coord = tuple(map(
+                operator.add, text_coord, (0, 5 + space)
+            ))
+        text_coord = mapwv.toWorldCoordinates(x=text_coord[0], y=text_coord[1])
     else:
         color = DARKGRAY
-        if mapwv.aspect > 1:
-            pts[0].x += radius * mapwv.aspect + space * 0.5
+        anchor = "w"
+        text_coord = mapwv.toScreenCoordinates(text_coord)
+        if mapwv.aspect > 2:
+            text_coord = tuple(map(
+                operator.add, text_coord, (5 + space, 0)
+            ))
         else:
-            pts[0].x += radius + space * 0.5
+            text_coord = tuple(map(
+                operator.add, text_coord, (radius + space, 0)
+            ))
+        text_coord = mapwv.toWorldCoordinates(x=text_coord[0], y=text_coord[1])
+
 
     circ(center, radius, color=color)
 
     try:
-        text(pts[0], f"{rnode.data} {rnode.counter}")
+        text(text_coord, f"{rnode.data} {rnode.counter}", anchor)
     except:
-        text(pts[0], f"{rnode.data}")
+        text(text_coord, f"{rnode.data}", anchor)
 
 
     if (rnode.left != NullNode):
@@ -494,6 +531,8 @@ def displayTree():
 
     dx = 4 * radius + space
     nnode *= dx
+
+    # defining world size
     p1 = WorldPoint(0.0, 0.0)
     p2 = WorldPoint(nnode, nnode)
 
@@ -617,7 +656,6 @@ def getType(tname):
     return type
 
 
-
 # =========================  keyboardHandler  ===================================#
 
 ## handles callbacks generated by keyboard events.
@@ -737,34 +775,43 @@ def handle_args(argv):
 #        - number of nodes.
 #
 def main(argv=None):
-    global mapwv, app, c, font
+    global mapwv, app, c, font, fontNormal, fontSmall
     if argv is None:
         argv = sys.argv
 
     type, nNodes, ndata = handle_args(argv)
 
-    mapwv = mapper((0, 0, 1, 1), (0, 0, CANVAS_WIDTH, CANVAS_HEIGHT))
+    ## horizontal padding inside canvas
+    hpadding = 10
+
+    ## Initialize tkinter root
     app = Tk()
     ## font for rendering normal text.
     fontNormal = font.Font(family="Helvetica", size=12)
     ## font for rendering small text.
-    fontSmall = font.Font(family='times', size=10)
+    fontSmall = font.Font(family='times', size=8)
     ## current font.
     font = fontNormal
-
+    ## initialize canvas widget
     c = Canvas(app, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
                background=BACKGROUND)
+    ## binding mouse events
     mouse_handler(c)
+    ## binding keyboard events
     c.bind("<Key>", keyboard_handler)
     c.pack(fill=BOTH, expand=YES)
+    ## set focus to canvas automatically
     c.focus_set()
-
+    ## initialize Window-Viewport mapper with viewport padding
+    mapwv = mapper((0, 0, 1, 1), (0 + hpadding, 0, CANVAS_WIDTH - hpadding, CANVAS_HEIGHT))
+    ## initialize tree
     createTree(type, nNodes, ndata)
     try:
         redraw()
         app.mainloop()
-    except:
+    except AttributeError as e:
         app.destroy()
+        raise e
 
 
 if __name__ == "__main__":
